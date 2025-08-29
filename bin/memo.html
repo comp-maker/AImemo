@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>로컬 메모장</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      display: flex; 
+      height: 100vh; 
+    }
+    
+    .sidebar {
+      width: 250px;
+      background-color: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    
+    .main-content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #495057;
+    }
+    
+    .memo-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .memo-item {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      background-color: white;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      position: relative;
+    }
+    
+    .memo-item:hover {
+      background-color: #e9ecef;
+    }
+    
+    .memo-item.selected {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+    
+    .memo-item .memo-actions {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex; /* 항상 표시되도록 변경 */
+      gap: 4px;
+      z-index: 10;
+    }
+    
+    .memo-item:hover .memo-actions {
+      display: flex;
+    }
+    
+    .memo-item.selected .memo-actions {
+      display: flex;
+    }
+    
+    .action-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      color: white;
+      min-width: 40px;
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    
+    .rename-btn {
+      background-color: #ffc107;
+      border-color: #e0a800;
+    }
+    
+    .rename-btn:hover {
+      background-color: #e0a800;
+    }
+    
+    .delete-btn {
+      background-color: #dc3545;
+      border-color: #c82333;
+    }
+    
+    .delete-btn:hover {
+      background-color: #c82333;
+    }
+    
+    .refresh-btn, .new-memo-btn {
+      width: 100%;
+      padding: 8px;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    
+    .refresh-btn {
+      background-color: #28a745;
+    }
+    
+    .refresh-btn:hover {
+      background-color: #218838;
+    }
+    
+    .new-memo-btn {
+      background-color: #17a2b8;
+    }
+    
+    .new-memo-btn:hover {
+      background-color: #138496;
+    }
+    
+    .input-group { 
+      margin-bottom: 12px; 
+    }
+    
+    .input-group label { 
+      display: block; 
+      margin-bottom: 4px; 
+      font-weight: bold; 
+    }
+    
+    .input-group input { 
+      width: 100%; 
+      padding: 8px; 
+      font-size: 14px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px; 
+    }
+    
+    textarea { 
+      flex: 1;
+      font-size: 16px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px; 
+      padding: 8px; 
+      resize: none;
+    }
+    
+    button { 
+      margin-top: 8px; 
+      padding: 8px 16px; 
+      background-color: #007bff; 
+      color: white; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+    }
+    
+    button:hover { 
+      background-color: #0056b3; 
+    }
+    
+    .status { 
+      margin-top: 8px; 
+      color: #666; 
+      font-size: 14px; 
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 20px;
+      border-radius: 8px;
+      width: 300px;
+    }
+    
+    .modal input {
+      width: 100%;
+      padding: 8px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    
+    .modal-buttons {
+      text-align: right;
+      margin-top: 16px;
+    }
+    
+    .modal-buttons button {
+      margin-left: 8px;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h3>📁 메모 목록</h3>
+    <button class="new-memo-btn" onclick="newMemo()">📝 새 메모</button>
+    <button class="refresh-btn" onclick="refreshMemoList()">🔄 새로고침</button>
+    <ul id="memoList" class="memo-list">
+      <li>로딩 중...</li>
+    </ul>
+  </div>
+  
+  <div class="main-content">
+    <h2>📝 메모 작성</h2>
+    
+    <div class="input-group">
+      <label for="filename">파일명 (확장자 제외):</label>
+      <input type="text" id="filename" placeholder="메모 제목을 입력하세요..." value="memo">
+    </div>
+    
+    <div class="input-group">
+      <label for="memo">메모 내용:</label>
+      <textarea id="memo" placeholder="여기에 메모를 작성하세요..."></textarea>
+    </div>
+    
+    <button onclick="saveMemo()">저장</button>
+    <div id="status" class="status">Java 연결 상태 확인 중...</div>
+  </div>
+
+  <!-- 이름 변경 모달 -->
+  <div id="renameModal" class="modal">
+    <div class="modal-content">
+      <h3>메모 이름 변경</h3>
+      <input type="text" id="newFilename" placeholder="새 파일명을 입력하세요">
+      <div class="modal-buttons">
+        <button onclick="closeRenameModal()">취소</button>
+        <button onclick="confirmRename()">변경</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentMemoFile = null;
+    let isNewMemo = true;
+    let renameTargetFile = null;
+    
+    // 페이지 로드 시 Java 브릿지 상태 확인
+    window.addEventListener('load', function() {
+      console.log('페이지 로드 완료');
+      // 약간의 지연 후 브릿지 확인
+      setTimeout(checkJavaBridge, 200);
+    });
+
+    function checkJavaBridge() {
+      const statusDiv = document.getElementById('status');
+      console.log('Java 브릿지 확인 중...', window.java);
+      
+      if (window.java && typeof window.java.saveMemo === 'function') {
+        statusDiv.textContent = '✅ Java 연결 완료 - 저장 가능';
+        statusDiv.style.color = 'green';
+        console.log('Java 브릿지 연결됨:', window.java);
+        
+        // 메모 목록 로드
+        refreshMemoList();
+      } else {
+        statusDiv.textContent = '❌ Java 연결 실패 - 저장 불가';
+        statusDiv.style.color = 'red';
+        console.log('Java 브릿지 연결 안됨:', window.java);
+        
+        // 1초 후 다시 확인
+        setTimeout(checkJavaBridge, 1000);
+      }
+    }
+
+    function newMemo() {
+      console.log('새 메모 생성');
+      
+      // UI 초기화
+      document.getElementById('filename').value = 'memo';
+      document.getElementById('memo').value = '';
+      currentMemoFile = null;
+      isNewMemo = true;
+      
+      // 선택된 항목 해제
+      document.querySelectorAll('.memo-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+      
+      // 파일명 필드에 포커스
+      document.getElementById('filename').focus();
+    }
+
+    function refreshMemoList() {
+      if (!window.java || !window.java.getMemoList) {
+        console.log('Java 브릿지가 준비되지 않음');
+        return;
+      }
+      
+      try {
+        const memoListJson = window.java.getMemoList();
+        console.log('받은 메모 목록 JSON:', memoListJson);
+        const memoFiles = JSON.parse(memoListJson);
+        
+        const memoListElement = document.getElementById('memoList');
+        memoListElement.innerHTML = '';
+        
+        if (memoFiles.length === 0) {
+          memoListElement.innerHTML = '<li style="color: #666; font-style: italic;">메모가 없습니다</li>';
+        } else {
+          memoFiles.forEach(filename => {
+            console.log('메모 항목 생성 중:', filename);
+            
+            const li = document.createElement('li');
+            li.className = 'memo-item';
+            li.textContent = filename.replace('.txt', '');
+            li.onclick = () => loadMemo(filename);
+            
+            // 액션 버튼 추가
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'memo-actions';
+            
+            // 이름 변경 버튼
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'action-btn rename-btn';
+            renameBtn.textContent = '✏️';
+            renameBtn.title = '이름 변경';
+            renameBtn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('이름 변경 버튼 클릭:', filename);
+              showRenameModal(filename);
+            };
+            
+            // 삭제 버튼
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'action-btn delete-btn';
+            deleteBtn.textContent = '삭제';
+            deleteBtn.title = '삭제';
+            deleteBtn.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('삭제 버튼 클릭:', filename);
+              deleteMemo(filename);
+            };
+            
+            // 버튼이 제대로 생성되었는지 확인
+            console.log('버튼 생성 완료:', { 
+              renameBtn: !!renameBtn, 
+              deleteBtn: !!deleteBtn,
+              filename: filename
+            });
+            
+            actionsDiv.appendChild(renameBtn);
+            actionsDiv.appendChild(deleteBtn);
+            li.appendChild(actionsDiv);
+            
+            memoListElement.appendChild(li);
+          });
+        }
+        
+        console.log('메모 목록 새로고침 완료:', memoFiles.length + '개 파일');
+      } catch (error) {
+        console.error('메모 목록 새로고침 실패:', error);
+      }
+    }
+    
+    function loadMemo(filename) {
+      console.log('=== 메모 불러오기 시도 ===');
+      console.log('파일명:', filename);
+      
+      if (!window.java || !window.java.loadMemo) {
+        console.log('Java 브릿지가 준비되지 않음');
+        return;
+      }
+      
+      try {
+        const content = window.java.loadMemo(filename);
+        console.log('Java에서 받은 내용 길이:', content.length);
+        
+        const filenameWithoutExt = filename.replace('.txt', '');
+        
+        // UI 업데이트
+        document.getElementById('filename').value = filenameWithoutExt;
+        document.getElementById('memo').value = content;
+        currentMemoFile = filename;
+        isNewMemo = false;
+        
+        // 선택된 항목 표시
+        document.querySelectorAll('.memo-item').forEach(item => {
+          item.classList.remove('selected');
+          if (item.textContent === filenameWithoutExt) {
+            item.classList.add('selected');
+          }
+        });
+        
+        console.log('✅ 메모 불러오기 완료:', filename);
+      } catch (error) {
+        console.error('❌ 메모 불러오기 실패:', error);
+        alert('메모를 불러오는 중 오류가 발생했습니다.');
+      }
+    }
+    
+    function deleteMemo(filename) {
+      console.log('=== 메모 삭제 시도 ===');
+      console.log('삭제할 파일명:', filename);
+      console.log('window.java 존재:', !!window.java);
+      console.log('window.java.deleteMemo 존재:', !!(window.java && window.java.deleteMemo));
+      
+      if (!confirm(`"${filename.replace('.txt', '')}" 메모를 삭제하시겠습니까?`)) {
+        console.log('사용자가 삭제를 취소함');
+        return;
+      }
+      
+      if (!window.java || !window.java.deleteMemo) {
+        console.log('Java 브릿지가 준비되지 않음');
+        alert('Java 연결이 준비되지 않았습니다.');
+        return;
+      }
+      
+      try {
+        console.log('Java deleteMemo 함수 호출 시도...');
+        const success = window.java.deleteMemo(filename);
+        console.log('Java에서 반환된 결과:', success);
+        
+        if (success) {
+          console.log('✅ 메모 삭제 성공:', filename);
+          alert('메모가 삭제되었습니다.');
+          
+          // 현재 선택된 메모가 삭제된 경우 새 메모로 초기화
+          if (currentMemoFile === filename) {
+            console.log('현재 편집 중인 메모가 삭제됨, 새 메모로 초기화');
+            newMemo();
+          }
+          
+          // 목록 새로고침
+          setTimeout(() => {
+            console.log('목록 새로고침 시작');
+            refreshMemoList();
+          }, 100);
+        } else {
+          console.error('❌ 메모 삭제 실패:', filename);
+          alert('메모 삭제에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('❌ 메모 삭제 오류:', error);
+        alert('메모 삭제 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+    
+    function showRenameModal(filename) {
+      renameTargetFile = filename;
+      const filenameWithoutExt = filename.replace('.txt', '');
+      document.getElementById('newFilename').value = filenameWithoutExt;
+      document.getElementById('renameModal').style.display = 'block';
+      document.getElementById('newFilename').focus();
+    }
+    
+    function closeRenameModal() {
+      document.getElementById('renameModal').style.display = 'none';
+      renameTargetFile = null;
+    }
+    
+    function confirmRename() {
+      const newFilename = document.getElementById('newFilename').value.trim();
+      
+      if (!newFilename) {
+        alert('새 파일명을 입력해주세요.');
+        return;
+      }
+      
+      if (!window.java || !window.java.renameMemo) {
+        console.log('Java 브릿지가 준비되지 않음');
+        return;
+      }
+      
+      try {
+        const success = window.java.renameMemo(renameTargetFile, newFilename);
+        if (success) {
+          console.log('✅ 메모 이름 변경 성공:', renameTargetFile + ' → ' + newFilename);
+          alert('메모 이름이 변경되었습니다.');
+          
+          // 현재 선택된 메모가 변경된 경우 파일명 업데이트
+          if (currentMemoFile === renameTargetFile) {
+            currentMemoFile = newFilename + '.txt';
+            document.getElementById('filename').value = newFilename;
+          }
+          
+          // 목록 새로고침
+          refreshMemoList();
+        } else {
+          console.error('❌ 메모 이름 변경 실패:', renameTargetFile);
+          alert('메모 이름 변경에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('❌ 메모 이름 변경 오류:', error);
+        alert('메모 이름 변경 중 오류가 발생했습니다.');
+      }
+      
+      closeRenameModal();
+    }
+
+    function saveMemo() {
+      const content = document.getElementById("memo").value || "";
+      const filename = document.getElementById("filename").value || "memo";
+      
+      console.log('=== 저장 시도 ===');
+      console.log('파일명:', filename);
+      console.log('내용 길이:', content.length);
+      console.log('현재 파일:', currentMemoFile);
+      console.log('새 메모 여부:', isNewMemo);
+      console.log('내용 미리보기:', content.substring(0, 50) + (content.length > 50 ? '...' : ''));
+      console.log('window.java 존재:', !!window.java);
+      console.log('window.java.saveMemo 존재:', !!(window.java && window.java.saveMemo));
+      console.log('window.java 타입:', typeof window.java);
+      
+      // 입력 검증
+      if (!content.trim()) {
+        alert('메모 내용을 입력해주세요.');
+        return;
+      }
+      
+      if (!filename.trim()) {
+        alert('파일명을 입력해주세요.');
+        return;
+      }
+      
+      // Java(Main.java의 MemoBridge 객체)에 전달
+      if (window.java && typeof window.java.saveMemo === 'function') {
+        try {
+          console.log('Java 함수 호출 시도...');
+          console.log('전달할 매개변수:', { content: content.substring(0, 20) + '...', filename: filename });
+          
+          // Java 함수 호출
+          window.java.saveMemo(content, filename);
+          
+          console.log('✅ 저장 성공');
+          alert("메모가 저장되었습니다!");
+          
+          // 저장 후 목록 새로고침 및 현재 파일 업데이트
+          setTimeout(() => {
+            refreshMemoList();
+            // 저장된 파일을 현재 파일로 설정
+            currentMemoFile = filename + '.txt';
+            isNewMemo = false;
+            console.log('저장 후 상태 업데이트:', { currentMemoFile, isNewMemo });
+          }, 500);
+        } catch (error) {
+          console.error('❌ 저장 오류:', error);
+          alert("저장 중 오류가 발생했습니다: " + error.message);
+        }
+      } else {
+        console.error('❌ Java 브릿지 없음');
+        console.log('window.java:', window.java);
+        alert("Java 연결이 아직 준비되지 않았습니다. 페이지를 새로고침해주세요.");
+        checkJavaBridge();
+      }
+    }
+    
+    // 모달 외부 클릭 시 닫기
+    window.onclick = function(event) {
+      const modal = document.getElementById('renameModal');
+      if (event.target === modal) {
+        closeRenameModal();
+      }
+    }
+  </script>
+</body>
+</html>
